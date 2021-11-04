@@ -1,0 +1,75 @@
+# DataCamp Certification Case Study
+
+### Project Brief
+
+You are on the data science team for a coffee company that is looking to expand their business into Ukraine. They want to get an understanding of the existing coffee shop market there.
+
+You have a dataset from Google businesses. It contains information about coffee shops in Ukraine. The marketing manager wants to identify the key coffee shop segments. They will use this to construct their marketing plan. In their current location, they split the market into 5 segments. The marketing manager wants to know how many segments are in this new market, and their key features.
+
+You will be presenting your findings to the Marketing Manager, who has no data science background.
+
+The data you will use for this analysis can be accessed here: `"data/coffee_shops.csv"`
+
+```{r message = FALSE}
+# Use this cell to begin, and add as many cells as you need to complete your analysis!
+library(tidyr)
+library(dplyr)
+library(ggplot2)
+library(fastDummies)
+
+coffee_shops <- read.csv("data/coffee_shops.csv")
+ggplot(coffee_shops, aes(x = Rating, fill = Region, main = "Distribution of rating in each region")) + geom_histogram() + facet_wrap(~ Region) + ggtitle("Rating of places in each region") 
+
+coffee_shops_by_price <- coffee_shops %>% group_by(Region, Price) %>%
+  count(Place.name) %>% summarize(count = sum(n))
+ggplot(coffee_shops_by_price, aes(x = Price, y = count, fill = Price))  + geom_col() + facet_wrap(~ Region) + ggtitle("Price of places in each region") 
+
+ggplot(coffee_shops, aes(x = Reviews, y= Rating, col = Takeout.option)) + geom_point() + geom_jitter() + ggtitle("Number of reviews vs. Rating of Takout and non-takeout businesses")
+
+# Delete the place name column, not needed for this analysis
+coffee_shops <- coffee_shops %>% select(-Place.name)
+
+#Convert the logical variables into numerical values (0 = no, 1 = yes)
+coffee_shops$Delivery.option <- as.numeric(coffee_shops$Delivery.option)
+coffee_shops$Dine.in.option <- as.numeric(coffee_shops$Dine.in.option)
+coffee_shops$Takeout.option <- as.numeric(coffee_shops$Takeout.option)
+coffee_shops[is.na(coffee_shops)] = 0
+
+# Identify the unique values of Region, Place.Type, and Price
+unique(coffee_shops$Region)
+unique(coffee_shops$Place.type)
+unique(coffee_shops$Price)
+
+# Convert the other character variables into numeric dummy variables:
+coffee_shops <- dummy_cols(coffee_shops)
+coffee_shops <- coffee_shops %>% select_if(is.numeric)
+
+# Scale the data:
+coffee_shops <- scale(coffee_shops)
+
+# Find out how many clusters there are within the data:
+wss <- 0
+for(i in 1:15){
+  km.out <- kmeans(coffee_shops, centers = i, nstart = 20)
+  wss[i] <- km.out$tot.withinss
+}
+
+# Plot the data to find the elbow, and thus the number of clusters to use within kmeans:
+plot(1:15, wss, xlab = "Number of Clusters", ylab = "Sum of squares")
+
+# Looks like 3 clusters works just fine
+# Run kmeans with centers = 3:
+clusters <- kmeans(coffee_shops, centers = 3, iter.max = 10)
+clusters$centers
+# I viewed this file in excel to find the patterns within the extreme values of each cluster:
+write.csv(clusters$centers, file = "clusters.csv")
+
+# Key segments according to the data:
+# Segment 1: Regions: Lviv, Odessa, & Kharkiv, Type: Coffee shop, Have Dine-in & Takeout options, Price: Moderate, Larger amount of reviews
+
+# Segment 2: Regions: Dnipro & Khrivoy Rog, Type: Cafe & Restaurant, Have Delivery, Dine-in & Takeout options, Price: Mostly pretty expensive
+
+# Segment 3: Regions: Odessa & Zaporozhye, Type: Store, Coffee roasters, Espresso bar & Coffee Store, No takeout, delivery or dine-in option, Price: Very Cheap
+
+```
+
